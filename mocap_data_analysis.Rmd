@@ -1,0 +1,128 @@
+---
+title: "Mocap & Sensor Data Analysis"
+output: html_notebook
+---
+
+```{r, warning=FALSE}
+
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(corrr)
+library(reshape2)
+```
+
+```{r}
+
+# Load data
+sensor_data <- read_csv("/Users/teresanguyen/Downloads/SensorDuringMocap_23052025_ProcessedData.csv", show_col_types=FALSE)
+mocap_data <- read_csv("/Users/teresanguyen/Documents/Faboratory Stuff/mocap_data.csv", show_col_types=FALSE)
+
+```
+
+```{r}
+
+# Load data
+mocap_data <- read_csv("/Users/teresanguyen/Documents/Faboratory Stuff/mocap_data.csv", skip = 2, col_names = FALSE)
+
+# Remove all the columns we don't need based on the suit
+mocap_data <- mocap_data[, !(unlist(mocap_data[2, ]) %in% c("Skeleton 001:Skeleton 001", "Skeleton 001:Head", "Skeleton 001:Neck", "Skeleton 001:LHand", "Skeleton 001:LThumb1", "Skeleton 001:LThumb2", "Skeleton 001:LThumb3", "Skeleton 001:LIndex1", "Skeleton 001:LIndex2", "Skeleton 001:LIndex3", "Skeleton 001:LMiddle1", "Skeleton 001:LMiddle2", "Skeleton 001:LMiddle3", "Skeleton 001:LRing1", "Skeleton 001:LRing2", "Skeleton 001:LRing3", "Skeleton 001:LPinky1", "Skeleton 001:LPinky2", "Skeleton 001:LPinky3", "Skeleton 001:RHand", "Skeleton 001:RThumb1","Skeleton 001:RThumb2", "Skeleton 001:RThumb3", "Skeleton 001:RIndex1", "Skeleton 001:RIndex2", "Skeleton 001:RIndex3", "Skeleton 001:RMiddle1", "Skeleton 001:RMiddle2", "Skeleton 001:RMiddle3", "Skeleton 001:RRing1", "Skeleton 001:RRing2", "Skeleton 001:RRing3", "Skeleton 001:RPinky1", "Skeleton 001:RPinky2", "Skeleton 001:RPinky3", "Skeleton 001:LFoot", "Skeleton 001:LToe", "Skeleton 001:RFoot", "Skeleton 001:RToe", "Skeleton 001:LFHD", "Skeleton 001:RBHD", "Skeleton 001:LBHD", "Skeleton 001:RFHD", "Skeleton 001:C7", "Skeleton 001:LUArm", "Skeleton 001:LFArm", "Skeleton 001:LFIN", "Skeleton 001:RUArm", "Skeleton 001:RFArm", "Skeleton 001:RFIN", "Skeleton 001:LASI", "Skeleton 001:LPSI", "Skeleton 001:RPSI", "Skeleton 001:RASI", "Skeleton 001:LThigh", "Skeleton 001:LANK", "Skeleton 001:LHEE", "Skeleton 001:LTOE", "Skeleton 001:RThigh", "Skeleton 001:RANK", "Skeleton 001:RHEE", "Skeleton 001:RTOE", "Skeleton 001:LANK", "Skeleton 001:LASI", "Skeleton 001:RShin", "Skeleton 001:LTHI", "Skeleton 001:LKNE", "left_tibia", "Skeleton 001:RTHI", "Skeleton 001:RKNE", "Skeleton 001:LShin") | is.na(unlist(mocap_data[2, ])))]
+
+# check the column names
+mocap_data[2, ]
+
+# Check result
+head(mocap_data)
+
+```
+
+```{r}
+
+# Vicon dictionary
+joint_map <- c(
+  "Skeleton 001:Ab"    = "abdomen",
+  "Skeleton 001:Chest" = "chest",
+  "Skeleton 001:LShoulder" = "left_shoulder",
+  # "Skeleton 001:LUArm" = "left_upper_arm",
+  # "Skeleton 001:LFArm" = "left_forearm",
+  "Skeleton 001:RShoulder" = "right_shoulder",
+  # "Skeleton 001:RUArm" = "right_upper_arm",
+  "Skeleton 001:RFArm" = "right_forearm",
+  # "Skeleton 001:LThigh" = "left_thigh",
+  "Skeleton 001:LShin" = "left_shin",
+  # "Skeleton 001:RThigh" = "right_thigh",
+  "Skeleton 001:RShin" = "right_shin",
+  "Skeleton 001:T10" = "10th_thoracic_vertebra",
+  "Skeleton 001:RBAK" = "right_back",
+  "Skeleton 001:CLAV" = "clavicle",
+  "Skeleton 001:STRN" = "sternum",
+  "Skeleton 001:LSHO" = "left_shoulder",
+  "Skeleton 001:LUPA" = "left_upper_arm",
+  "Skeleton 001:LELB" = "left_elbow",
+  "Skeleton 001:LFRM" = "left_forearm",
+  "Skeleton 001:LWRB" = "left_wrist_b",
+  "Skeleton 001:LWRA" = "left_wrist_a",
+  "Skeleton 001:RSHO" = "right_shoulder",
+  "Skeleton 001:RUPA" = "right_upper_arm",
+  "Skeleton 001:RELB" = "right_elbow",
+  "Skeleton 001:RFRM" = "right_forearm",
+  "Skeleton 001:RWRB" = "right_wrist_b",
+  "Skeleton 001:RWRA" = "right_wrist_a",
+  "Skeleton 001:RFIN" = "right_finger",
+  "Skeleton 001:LTHI" = "left_thigh",
+  "Skeleton 001:LKNE" = "left_knee",
+  "Skeleton 001:LTIB" = "left_tibia",
+  # "Skeleton 001:LANK" = "left_ankle",
+  # "Skeleton 001:LHEE" = "left_heel",
+  "Skeleton 001:RTHI" = "right_thigh",
+  "Skeleton 001:RKNE" = "right_knee",
+  "Skeleton 001:RTIB" = "right_tibia",
+  "Skeleton 001:CLAV" = "clavicle",
+  "Skeleton 001:LFIN" = "left_finger"
+)
+
+
+
+```
+
+```{r}
+
+# original joint names extracted
+original_joint_names <- unlist(mocap_data[2, ])
+
+renamed_joint_names <- sapply(original_joint_names, function(joint) {
+  if (!is.na(joint) && joint %in% names(joint_map)) {
+    joint_map[[joint]]
+  } else {
+    joint
+  }
+})
+
+# extract data type and axis for combination
+data_type <- unlist(mocap_data[3, ])
+axis <- unlist(mocap_data[5, ])
+
+new_colnames <- paste(renamed_joint_names, axis, sep = "_")
+
+# Remove spaces and NA
+new_colnames <- gsub("NA", "", new_colnames)
+new_colnames <- gsub("__", "_", new_colnames)
+
+# remove first 7 rows for new headers
+mocap_data <- mocap_data[-c(1:7), ]
+colnames(mocap_data) <- new_colnames
+
+# Checks
+head(mocap_data)
+
+```
+
+```{r}
+# Rename sensor columns for easier reference
+names(sensor_data) <- paste0("Sensor_", 1:ncol(sensor_data), "_Joint_X")
+head(sensor_data)
+
+```
+
